@@ -39,15 +39,19 @@
 #define DEBUG DEBUG_PRINT
 #include "net/ip/uip-debug.h"
 
+#define SEND_INTERVAL        1 * CLOCK_SECOND//alterado para 5 segundos original 15
+#define MAX_PAYLOAD_LEN        40
+#define CONN_PORT     8802
+#define MDNS 0 // 0 configura para zerar o MDNS
+
+
 #define LED_TOGGLE_REQUEST  (0x79)
 #define LED_SET_STATE  (0x7A)
 #define LED_GET_STATE  (0x7B)
 #define LED_STATE  (0x7C)
 
-#define SEND_INTERVAL		15 * CLOCK_SECOND
-#define MAX_PAYLOAD_LEN		40
-#define CONN_PORT     8802
-#define MDNS 0
+#define OP_REQUEST (0X6E)
+#define OP_RESULT (0X6F)
 
 static char buf[MAX_PAYLOAD_LEN];
 
@@ -60,7 +64,7 @@ static struct uip_udp_conn *client_conn;
 PROCESS(udp_client_process, "UDP client process");
 AUTOSTART_PROCESSES(&resolv_process,&udp_client_process);
 /*---------------------------------------------------------------------------*/
-static void
+/*static void
 tcpip_handler(void)
 {
     char *dados;
@@ -70,6 +74,64 @@ tcpip_handler(void)
         dados[uip_datalen()] = '\0';
         printf("Response from the server: '%s'\n", dados);
     }
+}*/
+
+
+static void
+tcpip_handler(void)
+{
+    char i=0;
+#define SEND_ECHO (0xBA)
+    if(uip_newdata()) //verifica se novos dados foram recebidos
+    {
+        char* dados = ((char*)uip_appdata); //este buffer é padrão do contiki
+        PRINTF("Recebidos %d bytes\n", uip_datalen());
+        switch (dados[0])
+        {
+        case LED_GET_STATE:
+
+            buf[0] = LED_STATE;
+            buf[1] = leds_get();
+
+            uip_ipaddr_copy(&client_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
+            client_conn->rport = UIP_UDP_BUF->destport;
+            uip_udp_packet_send(client_conn, buf, uip_datalen());
+            PRINTF("Enviando para [");
+            PRINT6ADDR(&client_conn->ripaddr);
+            PRINTF("]:%u\n", UIP_HTONS(client_conn->rport));
+            break;
+
+
+        case LED_SET_STATE:
+
+
+            leds_off(LEDS_ALL);
+            leds_on(dados[1]);
+
+            buf[0] = LED_STATE;
+            buf[1] = leds_get();
+
+            uip_ipaddr_copy(&client_conn->ripaddr, &UIP_IP_BUF->srcipaddr);
+            client_conn->rport = UIP_UDP_BUF->destport;
+            uip_udp_packet_send(client_conn, buf, uip_datalen());
+            PRINTF("Enviando para [");
+            PRINT6ADDR(&client_conn->ripaddr);
+            PRINTF("]:%u\n", UIP_HTONS(client_conn->rport));
+            break;
+
+        default:
+
+            PRINTF("Comando Invalido: ");
+            for(i=0;i<uip_datalen();i++)
+            {
+                PRINTF("0x%02X ",dados[i]);
+            }
+            PRINTF("\n");
+            break;
+
+        }
+    }
+    return;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -78,40 +140,53 @@ timeout_handler(void)
 {
     char payload = 0;
 
-    buf[0] = payload;
+    buf[0] = LED_TOGGLE_REQUEST;//
+    buf[1] = 0;
     if(uip_ds6_get_global(ADDR_PREFERRED) == NULL) {
-      PRINTF("Aguardando auto-configuracao de IP\n");
-      return;
+        PRINTF("Aguardando auto-configuracao de IP\n");
+        return;
     }
-    uip_udp_packet_send(client_conn, buf, strlen(buf));
+
+    PRINTF("Cliente para ["); //add ao codigo conforme exercicio sala
+    PRINT6ADDR(&client_conn->ripaddr);//add ao codigo conforme exercicio sala
+    PRINTF("]:%u\n", UIP_HTONS(client_conn->rport));//add ao codigo conforme exercicio sala
+
+    // uip_udp_packet_send(client_conn, buf, strlen(buf));
+
+    uip_udp_packet_send(client_conn, buf, 2);
+
+
 }
 /*---------------------------------------------------------------------------*/
 static void
 print_local_addresses(void)
 {
-  int i;
-  uint8_t state;
+    int i;
+    uint8_t state;
 
-  PRINTF("Client IPv6 addresses: ");
-  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
-    state = uip_ds6_if.addr_list[i].state;
-    if(uip_ds6_if.addr_list[i].isused &&
-       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
-      PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
-      PRINTF("\n");
+    PRINTF("Client IPv6 addresses: ");
+    for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
+        state = uip_ds6_if.addr_list[i].state;
+        if(uip_ds6_if.addr_list[i].isused &&
+                (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
+            PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
+            PRINTF("\n");
+        }
     }
-  }
 }
 /*---------------------------------------------------------------------------*/
 #if UIP_CONF_ROUTER
 static void
 set_global_address(void)
 {
-  uip_ipaddr_t ipaddr;
+    uip_ipaddr_t ipaddr;
+    //uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
 
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+    uip_ip6addr(&ipaddr, 0Xfd00, 0, 0, 0, 0x0212, 0x4b00, 0x0aff, 0x6b01);
+    //uip_ip6addr(&ipaddr, 0Xfe80, 0, 0, 0, 0x0212, 0x4b00, 0x07b9, 0x5e8d);
+
+    uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+    uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
 }
 #endif /* UIP_CONF_ROUTER */
 /*---------------------------------------------------------------------------*/
@@ -161,69 +236,87 @@ set_connection_address(uip_ipaddr_t *ipaddr)
 #endif
 
 /*---------------------------------------------------------------------------*/
+
+
 PROCESS_THREAD(udp_client_process, ev, data)
 {
-  static struct etimer et;
-  uip_ipaddr_t ipaddr;
+    static struct etimer et;
+    uip_ipaddr_t ipaddr;
 
-  PROCESS_BEGIN();
-  PRINTF("UDP client process started\n");
+    PROCESS_BEGIN();
+    PRINTF("UDP client process started\n");
 
 #if UIP_CONF_ROUTER
-  //set_global_address();
+    //set_global_address();
 #endif
 
-  etimer_set(&et, 2*CLOCK_SECOND);
-  while(uip_ds6_get_global(ADDR_PREFERRED) == NULL)
-  {
-      PROCESS_WAIT_EVENT();
-      if(etimer_expired(&et))
-      {
-          PRINTF("Aguardando auto-configuracao de IP\n");
-          etimer_set(&et, 2*CLOCK_SECOND);
-      }
-  }
+    etimer_set(&et, 2*CLOCK_SECOND);
+    while(uip_ds6_get_global(ADDR_PREFERRED) == NULL)
+    {
+        PROCESS_WAIT_EVENT();
+        if(etimer_expired(&et))
+        {
+            PRINTF("Aguardando auto-configuracao de IP\n");
+            etimer_set(&et, 2*CLOCK_SECOND);
+        }
+    }
 
-
-  print_local_addresses();
+    print_local_addresses();
 
 
 
 #if MDNS
-  static resolv_status_t status = RESOLV_STATUS_UNCACHED;
-  while(status != RESOLV_STATUS_CACHED) {
-      status = set_connection_address(&ipaddr);
+    static resolv_status_t status = RESOLV_STATUS_UNCACHED;
+    while(status != RESOLV_STATUS_CACHED) {
+        status = set_connection_address(&ipaddr);
 
-      if(status == RESOLV_STATUS_RESOLVING) {
-          PROCESS_WAIT_EVENT_UNTIL(ev == resolv_event_found);
-      } else if(status != RESOLV_STATUS_CACHED) {
-          PRINTF("Can't get connection address.\n");
-          PROCESS_YIELD();
-      }
-  }
-#else
-  //c_onfigures the destination IPv6 address
-  uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x2000, 0x0002, 0x2145);
-#endif
-  /* new connection with remote host */
-  client_conn = udp_new(&ipaddr, UIP_HTONS(CONN_PORT), NULL);
-  udp_bind(client_conn, UIP_HTONS(CONN_PORT));
-
-  PRINT6ADDR(&client_conn->ripaddr);
-  PRINTF(" local/remote port %u/%u\n",
-	UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
-
-  etimer_set(&et, SEND_INTERVAL);
-  while(1) {
-    PROCESS_YIELD();
-    if(etimer_expired(&et)) {
-      timeout_handler();
-      etimer_restart(&et);
-    } else if(ev == tcpip_event) {
-      tcpip_handler();
+        if(status == RESOLV_STATUS_RESOLVING) {
+            //PROCESS_WAIT_EVENT_UNTIL(ev == resolv_event_found);
+            PROCESS_WAIT_EVENT();
+        } else if(status != RESOLV_STATUS_CACHED) {
+            PRINTF("Can't get connection address.\n");
+            PROCESS_YIELD();
+        }
     }
-  }
 
-  PROCESS_END();
+#else
+    //c_onfigures the destination IPv6 address
+    // uip_ip6addr(&ipaddr, 0xfe80, 0, 0, 0, 0x215, 0x2000, 0x0002, 0x2145);
+
+
+    //2804:14c:8786:8166:6c46:629c:595b:a943
+    //2804:14c:8786:8166:504f:22d7:b914:835f
+    //2804:14c:8786:8166:9133:99ff:5b17:3ba7
+    uip_ip6addr(&ipaddr, 0X2804, 0x14c, 0x8786, 0x8166, 0x9133, 0x99ff, 0x5b17, 0x3ba7);
+
+
+#endif
+    /* new connection with remote host */
+    client_conn = udp_new(&ipaddr, UIP_HTONS(CONN_PORT), NULL);
+    udp_bind(client_conn, UIP_HTONS(CONN_PORT));
+
+
+
+    //client_conn = udp_new(&ipaddr, UIP_HTONS(8802), NULL);
+    //udp_bind(client_conn, UIP_HTONS(8802));
+
+
+
+    PRINT6ADDR(&client_conn->ripaddr);
+    PRINTF(" local/remote port %u/%u\n",
+           UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
+
+    etimer_set(&et, SEND_INTERVAL);
+    while(1) {
+        PROCESS_YIELD();
+        if(etimer_expired(&et)) {
+            timeout_handler();
+            etimer_restart(&et);
+        } else if(ev == tcpip_event) {
+            tcpip_handler();
+        }
+    }
+
+    PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
