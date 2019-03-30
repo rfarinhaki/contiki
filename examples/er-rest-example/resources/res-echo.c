@@ -41,13 +41,14 @@
 #if PLATFORM_HAS_LEDS
 
 #include <string.h>
+#include <stdlib.h>
 #include "contiki.h"
 #include "rest-engine.h"
 #include "er-coap.h"
 #include "dev/leds.h"
 
-uint8_t msg_buffer[REST_MAX_CHUNK_SIZE];
-uint8_t msg_len;
+uint8_t msg_buffer[3][REST_MAX_CHUNK_SIZE];
+uint8_t msg_len[3];
 
 static void res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
 static void res_post_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset);
@@ -64,40 +65,56 @@ RESOURCE(res_echo,
 static void
 res_get_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
-    uint32_t i;
+    uint32_t i, buffernum=-1;
+    const char *cbuffernum;
     uint8_t etag=0;
+
     //configura o tipo de conteudo da mensagem
     REST.set_header_content_type(response, REST.type.TEXT_PLAIN);
     //etag eh uma propriedade que eh utilizada pelos servidores de cache para saber se uma mensagem mudou
     //duas mensagens com o mesmo valor devem ter o mesmo etag
-    for(i=0;i<msg_len;i++){
-        //nestecasoutilizamosumchecksumsimplescomoetag,masousuariopodeusaroquequiser
-        etag += msg_buffer[i];
-    }
+    if(REST.get_query_variable(request,"buffernumber",&cbuffernum))
+        buffernum = atoi(cbuffernum);
 
-    REST.set_header_etag(response, (uint8_t *)&etag, 1);
-    //configuraopayloadaserretornado
-    REST.set_response_payload(response, msg_buffer, msg_len);
+    if(buffernum >= 0 && buffernum < 3){
+        for(i=0;i<msg_len[buffernum];i++){
+            //nestecasoutilizamosumchecksumsimplescomoetag,masousuariopodeusaroquequiser
+            etag += msg_buffer[buffernum][i];
+        }
 
+        REST.set_header_etag(response, (uint8_t *)&etag, 1);
+        //configuraopayloadaserretornado
+        REST.set_response_payload(response, msg_buffer[buffernum], msg_len[buffernum]);
+    }else
+        REST.set_response_status(response, REST.status.BAD_REQUEST);
 
 }
 
 static void
 res_post_put_handler(void *request, void *response, uint8_t *buffer, uint16_t preferred_size, int32_t *offset)
 {
-
+    int bn;
+    const char *cbuffernum, *value;
     //converteopayloadrecebidoporPUTemumpacoteCoAP
     coap_packet_t *const coap_req = (coap_packet_t *)request;
     uint8_t buffer_ptr = 0;//verificaseopayloadenviadonaoehmuitograndeparaarequisicao
-    if(coap_req->payload_len > REST_MAX_CHUNK_SIZE){
+    if(coap_req->payload_len > REST_MAX_CHUNK_SIZE || !REST.get_post_variable(request,"buffernumber",&cbuffernum)){
         //caso for muito grande, simplesmente configura a resposta como BAD_REQUEST e retorna
         REST.set_response_status(response, REST.status.BAD_REQUEST);
         return;
     }else{
+            bn = atoi(cbuffernum);
+            if(bn>3 || bn < 0){
+                REST.set_response_status(response, REST.status.BAD_REQUEST);
+                return;
+            }
+            REST.get_post_variable(request,"value",&value);
+
+
         //casocontrario,copiaamensagemenviadaparaobuffercriado
-        memcpy((void*)msg_buffer, (void*)coap_req->payload, coap_req->payload_len);
+        memcpy((void*)msg_buffer[bn], (void*)value, coap_req->payload_len);
         //salvatambemotamanhodamensagemrecebida(parausofuturo)
-        msg_len= coap_req->payload_len;
+        msg_len[bn]= strlen(value);
     }
 
 }
