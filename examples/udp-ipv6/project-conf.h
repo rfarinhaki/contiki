@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010, Swedish Institute of Computer Science.
+ * Copyright (c) 2015, SICS Swedish ICT.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,12 +25,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+*
+ * \author Simon Duquennoy <simonduq@sics.se>
  */
 
-#ifndef PROJECT_CONF_H_
-#define PROJECT_CONF_H_
+#ifndef __PROJECT_CONF_H__
+#define __PROJECT_CONF_H__
 
+#undef ENERGEST_CONF_ON
+#define ENERGEST_CONF_ON (0)
+#define CC26XX_WEB_DEMO_6LBR_CLIENT (1)
 
 #define RF_CHANNEL (12)
-
-#endif /* PROJECT_CONF_H_ */
+#endif /* __PROJECT_CONF_H__ */
