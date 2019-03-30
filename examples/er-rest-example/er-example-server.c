@@ -103,6 +103,23 @@ extern resource_t res_sht11;
 PROCESS(er_example_server, "Erbium Example Server");
 AUTOSTART_PROCESSES(&er_example_server);
 
+static void
+print_local_addresses(void)
+{
+  int i;
+  uint8_t state;
+
+  PRINTF("Server IPv6 addresses: ");
+  for(i = 0; i < UIP_DS6_ADDR_NB; i++) {
+    state = uip_ds6_if.addr_list[i].state;
+    if(uip_ds6_if.addr_list[i].isused &&
+       (state == ADDR_TENTATIVE || state == ADDR_PREFERRED)) {
+      PRINT6ADDR(&uip_ds6_if.addr_list[i].ipaddr);
+      PRINTF("\n");
+    }
+  }
+}
+
 PROCESS_THREAD(er_example_server, ev, data)
 {
   PROCESS_BEGIN();
@@ -117,7 +134,7 @@ PROCESS_THREAD(er_example_server, ev, data)
 #ifdef IEEE802154_PANID
   PRINTF("PAN ID: 0x%04X\n", IEEE802154_PANID);
 #endif
-
+  print_local_addresses();
   PRINTF("uIP buffer: %u\n", UIP_BUFSIZE);
   PRINTF("LL header: %u\n", UIP_LLH_LEN);
   PRINTF("IP+UDP header: %u\n", UIP_IPUDPH_LEN);
