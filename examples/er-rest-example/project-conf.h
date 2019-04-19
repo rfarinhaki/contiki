@@ -103,3 +103,5 @@
 /* Enable client-side support for COAP observe */
 #define COAP_OBSERVE_CLIENT 1
 #endif /* __PROJECT_ERBIUM_CONF_H__ */
+
+#define RF_CHANNEL (12)

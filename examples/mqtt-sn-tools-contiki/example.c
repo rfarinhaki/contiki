@@ -143,6 +143,30 @@ publish_receiver(struct mqtt_sn_connection *mqc, const uip_ipaddr_t *source_addr
   memcpy(&incoming_packet, data, datalen);
   incoming_packet.data[datalen-7] = 0x00;
   printf("Published message received: %s\n", incoming_packet.data);
+
+  int msg=0;
+    char str[17];
+
+
+    strcpy(str, incoming_packet.data);
+
+    printf("%s\n", str);
+
+    msg=atoi(str);
+    printf("valor string= %s, valor atoi=%d\n", str, msg);
+
+    switch(msg){
+
+    case 1:
+
+       leds_on(LEDS_ALL);
+       break;
+
+    case 0:
+        leds_off(LEDS_ALL);
+        break;
+
+    }
   //see if this message corresponds to ctrl channel subscription request
   if (uip_htons(incoming_packet.topic_id) == ctrl_topic_id) {
     //the new message interval will be read from the first byte of the received packet
@@ -213,7 +237,7 @@ PROCESS_THREAD(publish_process, ev, data)
     while(1)
     {
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&send_timer));
-      sprintf(buf, "Message %" PRIu32, message_number); //removendo o warning do GCC para o uint32_t
+      sprintf(buf, "%" PRIu32, message_number); //removendo o warning do GCC para o uint32_t
       printf("publishing at topic: %s -> msg: %s\n", pub_topic, buf);
       message_number++;
       buf_len = strlen(buf);
@@ -299,7 +323,9 @@ set_connection_address(uip_ipaddr_t *ipaddr)
 {
 #ifndef UDP_CONNECTION_ADDR
 #if RESOLV_CONF_SUPPORTS_MDNS
-#define UDP_CONNECTION_ADDR       pksr.eletrica.eng.br
+#define UDP_CONNECTION_ADDR       farinhaki.com
+//#define UDP_CONNECTION_ADDR       pksr.eletrica.eng.br
+//#define UDP_CONNECTION_ADDR       FD00:BABA:CA::1
 #elif UIP_CONF_ROUTER
 #define UDP_CONNECTION_ADDR       fd00:0:0:0:0212:7404:0004:0404
 #else
@@ -458,7 +484,7 @@ PROCESS_THREAD(example_mqttsn_process, ev, data)
     {
       PROCESS_WAIT_EVENT();
       if(etimer_expired(&et)) {
-        leds_toggle(LEDS_ALL);
+        //leds_toggle(LEDS_ALL);
         etimer_restart(&et);
       }
     }
